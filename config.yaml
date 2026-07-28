@@ -1,0 +1,196 @@
+# ── Job Scanner configuration ─────────────────────────────────────────────
+# Sources: JSearch aggregator (Google for Jobs → LinkedIn/Indeed/ZipRecruiter/
+# Glassdoor/Monster) + ATS feeds (incl. Workday) + TinyFish niche boards.
+# API keys go in the .env file (not here).
+
+recency_days: 1            # keep postings <= this many days old (default = last 24h)
+require_title_match: true  # drop postings whose title matches none of the patterns
+us_empty_location_passes: true   # postings with a blank location still pass the geo gate
+
+# Which markets to keep. A posting's location is mapped to a region; it's
+# kept only if that region is listed here (blank locations pass as Unknown).
+# Scope is North America: US + Canada. Everything else (UK, India, EU, APAC)
+# is rejected.
+regions:
+  - US
+  - Canada
+  # - Mexico          # <-- uncomment this one line to also accept Mexican postings
+  #                     (detection is already built in; also add "mx" to the
+  #                     aggregator countries below to search Mexico on JSearch)
+
+# Safety net for the 24-hour window: a posting the scanner has NEVER seen
+# before still passes on first sight if its posted date is within this many
+# days — so skipping a day of runs doesn't silently lose 1-2 day-old posts.
+first_seen_grace_days: 3
+
+# target_country is legacy (single-market). The multi-region `regions` list
+# above is what the geo filter now uses; this is kept only for compatibility.
+target_country: US
+
+# Titles keyword list — used to build TinyFish extraction goals and as the
+# fallback gate when title_patterns is empty.
+titles:
+  - property accountant
+  - senior property accountant
+  - junior property accountant
+  - fund accountant
+  - senior fund accountant
+  - fund controller
+  - capital accountant
+  - staff accountant
+  - accounting manager
+  - assistant controller
+  - controller
+
+# The keep/drop gate: a posting survives if its title matches ANY regex below
+# (case-insensitive) AND matches none of title_exclude_patterns. Covers the
+# full set of roles hired by family offices, multifamily operators, CRE
+# firms, PE firms, and their back offices. Edit freely; bad patterns are
+# skipped with a warning. Employer-type CONTEXT (is this really RE / a family
+# office?) is decided later by the classifier, not here.
+title_patterns:
+  # ── Accounting: property, fund, general, back-office ──
+  - '(property|real\s*estate|lease|cam|joint\s*venture|project|development|construction)[\s-]+(management\s+)?account(ant|ing)'
+  - 'property\s+management\s+account(ant|ing)'
+  - 'payroll\s+account(ant|ing)'
+  - 'lease\s+administrat(ion|or)'
+  - '(property|fund)\s+controller'
+  - '(staff|senior|corporate)\s+accountant'
+  - 'accounting\s+manager'
+  - 'assistant\s+controller'
+  - '(?<!traffic\s)\bcontroller\b'   # plain "Controller" (Air Traffic Controller excluded below)
+  - '(fund|investment|portfolio|capital|family\s*office)\s+accountant'
+  - 'family\s+office\s+accounting'
+  # ── Investment side ──
+  - '(acquisitions?|investment|underwriting|financial|development|credit|portfolio|research)\s+analyst'
+  - '(investment|acquisitions?|portfolio|asset)\s+associate'
+  - 'asset\s+management\s+(analyst|associate)'
+  - 'capital\s+markets\s+analyst'
+  - '(real\s*estate|cre|multifamily|commercial)\s+underwriter'
+  - 'underwrit(er|ing).{0,40}(real\s*estate|cre|multifamily)'
+  - 'investor\s+relations(\s+(analyst|associate|manager))?'
+  # ── Asset ──
+  - 'asset\s+(management\s+)?analyst'
+  - 'asset\s+manager'
+  # ── Fund operations / back office ──
+  - 'fund\s+operations?(\s+(analyst|associate|manager))?'
+  - 'fund\s+administrat(or|ion)'
+  - '(portfolio|investment)\s+operations'
+  - 'treasury\s+analyst'
+  - 'financial\s+reporting\s+(analyst|associate|manager)'
+  - 'valuations?\s+(analyst|associate|manager)'
+  - 'tax\s+(analyst|associate|manager|accountant)'
+  - 'compliance\s+(analyst|associate|manager)'
+  - '(loan|asset)\s+servicing(\s+(analyst|associate|specialist))?'
+  # ── Accounts payable / receivable / billing ──
+  - 'accounts?\s+payable'
+  - '(accounts?\s+receivable|a/r|billing)\s+(specialist|analyst|coordinator|clerk|accountant)'
+  # ── Real-estate operations analysts ──
+  - 'lease\s+analyst'
+  - 'cam\s+analyst'
+
+# Drop a posting even if a title_pattern above matched. Exclusions always win.
+title_exclude_patterns:
+  - '\bintern(ship)?s?\b'                              # intern / interns / internship
+  - 'air\s+traffic\s+controller'                       # not a finance controller
+  - 'insurance.{0,25}underwrit'                        # insurance underwriter (either word order)
+  - 'underwrit.{0,25}insurance'
+  - '(life|health|auto|motor|casualty|p\s*&\s*c)\s+underwrit'
+
+connectors:
+
+  # Aggregator ON — JSearch (RapidAPI) indexes Google for Jobs, which carries
+  # LinkedIn, Indeed, ZipRecruiter, Glassdoor, Monster and thousands more.
+  # API calls per run = (number of queries) x (number of countries).
+  # With 7 queries x 2 countries = 14 calls per run. Mind your RapidAPI quota.
+  aggregator:
+    enabled: true
+    provider: jsearch
+    countries:
+      - us
+      - ca
+      # - mx            # <-- uncomment to also search Mexico (pairs with "Mexico" in regions)
+    queries:
+      - property accountant
+      - real estate accountant
+      - fund accountant
+      - family office accountant
+      - real estate acquisitions analyst
+      - asset management analyst real estate
+      - accounts payable real estate
+
+  # ATS feeds — free, no key. ats: greenhouse|lever|ashby|workable|
+  # smartrecruiters|workday. For workday, token = the careers-page URL.
+  ats:
+    enabled: true
+    companies: []
+      # - { name: "Example REIT", ats: workday, token: "https://example.wd5.myworkdayjobs.com/External" }
+      # - { name: "Example PM",   ats: greenhouse, token: "examplepm" }
+
+  # TinyFish — niche boards with no API. LinkedIn searches are location-scoped
+  # and use f_TPR=r86400 (posted in the last 24 hours). Scope = US + Canada.
+  tinyfish:
+    enabled: true
+    targets:
+      # US-only commercial real estate board. No 24h URL filter available, so
+      # the pipeline's recency filter (+ first-seen grace) does the cutting.
+      - { name: "SelectLeaders",       url: "https://www.selectleaders.com/jobs/?keywords=Fund+Accountant" }
+      # USA-scoped listing page (verified loads 200). Same note as above.
+      - { name: "eFinancialCareers",   url: "https://www.efinancialcareers.com/jobs/Fund-Accountant/in-USA" }
+      # LinkedIn public (no-login) guest search, per market, past 24h (f_TPR=r86400).
+      - { name: "LinkedIn US",         url: "https://www.linkedin.com/jobs/search?keywords=Fund%20Accountant&location=United%20States&f_TPR=r86400" }
+      - { name: "LinkedIn Canada",     url: "https://www.linkedin.com/jobs/search?keywords=Fund%20Accountant&location=Canada&f_TPR=r86400" }
+      # ── Disabled (out of North America scope) — re-enable by uncommenting ──
+      # - { name: "LinkedIn UK",         url: "https://www.linkedin.com/jobs/search?keywords=Fund%20Accountant&location=United%20Kingdom&f_TPR=r86400" }
+      # - { name: "LinkedIn India",      url: "https://www.linkedin.com/jobs/search?keywords=Fund%20Accountant&location=India&f_TPR=r86400" }
+
+# Rule-based classifier — assigns category/subcategory per posting from
+# keyword rules applied to title + description + company name. All keyword
+# lists live in classifier_rules.yaml — edit that file to tune, not code.
+classifier:
+  enabled: true
+  rules_file: classifier_rules.yaml
+
+# POC (point-of-contact) enrichment — per unique company, via TinyFish, runs
+# after classification. A company is looked up ONCE EVER (cached in
+# poc_cache.db) — set force_refresh: true for one run to re-look-up
+# everything, then set it back to false.
+poc_enrichment:
+  enabled: true
+  cap_per_run: 10          # max NEW companies looked up per run (cached/skipped companies don't count)
+  force_refresh: false      # true = ignore the cache and re-look-up every company (costs TinyFish steps)
+  cache_db: poc_cache.db
+  # Staffing/recruiting firms — always skipped (poc_source = "skipped -
+  # staffing firm"), no TinyFish steps spent. Matches if a company name
+  # CONTAINS one of these (e.g. "Vaco" matches "Vaco by Highspring").
+  # You maintain this list — add more any time.
+  blocklist:
+    - Vaco
+    - 3 Bridge Networks
+    - Atlantic Group
+    - LHH
+    - Madison-Davis
+    - Robert Half
+    - Hoxton Circle
+    - Frederick Fox
+    - Legacy Search Advisors
+    - Geneva Search Partners
+    - Daley And Associates
+    - LaSalle Network
+    - Russell Tobin
+    - Metric Geo
+    - Social Capital Resources
+    - E-Frontiers
+    - Wall Street Careers
+
+# Phone access — off by default (the app only serves 127.0.0.1, this PC).
+# Turn on to also install this as an app on your phone: set
+# allow_lan_access: true here AND set WEB_APP_PASSWORD in .env (both are
+# required — without a password, phone access stays off for safety, since
+# turning this on makes the app reachable by every device on your WiFi).
+web_app:
+  allow_lan_access: false
+
+output:
+  csv_path: output/jobs.csv
+  seen_db: seen.db

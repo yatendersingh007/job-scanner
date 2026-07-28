@@ -1,0 +1,204 @@
+# ── Classifier rules — EDIT ME ────────────────────────────────────────────
+# This file is the whole brain of the category/subcategory classifier.
+# Add or remove signal words freely; the next run picks them up. No code.
+#
+# How it works:
+#  1. Employer-type signals are searched (case-insensitive, whole words) in
+#     the COMPANY NAME + JOB DESCRIPTION of each posting.
+#  2. Category: Family Office signals -> "Family Office"; else Real Estate
+#     signals -> "Real Estate"; both -> whichever has MORE distinct hits
+#     (tie -> "Other"/"Needs Review"); neither -> "Other"/"Needs Review".
+#     The classifier never guesses.
+#  3. Subcategory: decided by the JOB TITLE, using the ordered rule lists
+#     below (first match wins).
+#  4. Every decision writes the keywords that fired into the CSV column
+#     "match_reason" so you can audit and tune these lists.
+
+# Also search the JOB TITLE for employer-type signals (not just company +
+# description)? false = strictly company+description (safer: an
+# "Underwriting Analyst" at an unknown insurer won't be mislabeled Real
+# Estate). Set true to categorize title-only rows more aggressively.
+include_title_in_signals: false
+
+family_office_signals:
+  - family office
+  - single family office
+  - single-family office
+  - multi-family office
+  - multi family office
+  - private investment office
+  - private wealth
+  - uhnw
+  - high-net-worth
+  - high net worth
+
+real_estate_signals:
+  - real estate
+  - reit
+  - reits
+  - multifamily
+  - multi-family housing
+  - property management
+  - commercial properties
+  - commercial property
+  - cre
+  - apartment
+  - apartments
+  - residential communities
+  - industrial portfolio
+  - retail portfolio
+  - office portfolio
+  - yardi
+  - mri software
+  - appfolio
+  - cam reconciliation
+  - cam reconciliations
+  - rent roll
+  - lease
+  - leases
+  - leasing
+  - tenant
+  - tenants
+  - acquisitions
+  - underwriting
+  - noi
+
+# Subcategory rules — matched against the JOB TITLE only, top to bottom,
+# first hit wins, so MORE SPECIFIC buckets are listed BEFORE catch-alls.
+# A title matching none of its category's rules gets subcategory
+# "Needs Review". Two subcategories are shared by both categories:
+# "Investor Relations" and "Fund Operations/Back Office".
+subcategories:
+  Real Estate:
+    - name: Investor Relations
+      title_keywords:
+        - investor relations
+        - ir analyst
+        - ir associate
+    - name: Fund Operations/Back Office
+      title_keywords:
+        - fund operations
+        - fund operation
+        - fund administrator
+        - fund administration
+        - portfolio operations
+        - investment operations
+        - treasury analyst
+        - treasury
+        - financial reporting
+        - valuation
+        - valuations
+        - tax analyst
+        - tax associate
+        - tax manager
+        - tax accountant
+        - compliance analyst
+        - compliance associate
+        - compliance manager
+        - loan servicing
+        - asset servicing
+        - servicing analyst
+    - name: Property Accounting
+      title_keywords:
+        - property accountant
+        - property accounting
+        - property management accountant
+        - real estate accountant
+        - lease accountant
+        - lease accounting
+        - lease administration
+        - lease administrator
+        - lease analyst
+        - cam accountant
+        - cam analyst
+        - joint venture accountant
+        - project accountant
+        - development accountant
+        - construction accountant
+        - property controller
+        - payroll accountant
+        - billing specialist
+        - accounts receivable
+        - a/r
+    - name: Investment Analyst/Underwriting
+      title_keywords:
+        - acquisitions analyst
+        - acquisition analyst
+        - acquisitions associate
+        - investment analyst
+        - investment associate
+        - underwriting analyst
+        - underwriter
+        - research analyst
+        - financial analyst
+        - development analyst
+        - capital markets analyst
+        - credit analyst
+    - name: Asset Analyst
+      title_keywords:
+        - asset management analyst
+        - asset management associate
+        - asset analyst
+        - portfolio analyst
+        - portfolio associate
+        - asset manager
+    - name: Accounts Payable
+      title_keywords:
+        - accounts payable
+        - account payable
+    - name: Staff Accountant
+      title_keywords:
+        - staff accountant
+        - senior accountant
+        - accounting manager
+        - assistant controller
+        - controller
+        - fund accountant
+        - accountant
+        - accounting
+
+  Family Office:
+    - name: Investor Relations
+      title_keywords:
+        - investor relations
+        - ir analyst
+        - ir associate
+    - name: Fund Operations/Back Office
+      title_keywords:
+        - fund operations
+        - fund operation
+        - fund administrator
+        - fund administration
+        - portfolio operations
+        - investment operations
+        - treasury analyst
+        - treasury
+        - financial reporting
+        - valuation
+        - valuations
+        - tax analyst
+        - tax associate
+        - tax manager
+        - tax accountant
+        - compliance analyst
+        - compliance associate
+        - compliance manager
+        - loan servicing
+        - asset servicing
+        - servicing analyst
+    - name: Fund Accountant
+      title_keywords:
+        - fund accountant
+        - fund controller
+        - investment accountant
+        - alternative investment accountant
+        - family office accountant
+        - family office accounting
+        - portfolio accountant
+        - staff accountant
+        - senior accountant
+        - accounting manager
+        - assistant controller
+        - controller
+        - accountant
+        - accounting
